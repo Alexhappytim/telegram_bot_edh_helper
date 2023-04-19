@@ -8,8 +8,8 @@ async def get_response(url):
             return await resp.json()
 
 
-async def get_rulings(set, number):
-    response = await get_response(f"""https://api.scryfall.com/cards/{set}/{number}/rulings""")
+async def get_rulings(url):
+    response = await get_response(url)
     ret = ""
     for i in response["data"]:
         if i["source"] == "wotc":
@@ -32,7 +32,3 @@ async def get_card(card):
         ret[1] = res
     return ret
 
-
-# name = input()
-# a = get_card(name)
-# print(get_rulings(a[1]["set"], a[1]["collector_number"]))

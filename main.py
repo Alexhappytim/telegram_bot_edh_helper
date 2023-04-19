@@ -35,20 +35,50 @@ async def bot_get_card_2(update, context):
     card = await get_card(update.message.text)
     if card[0] == "list":
         if card[1]["data"]:
-            mes = "Найдено несколько карт, вот список:\n\n"
+            text = "Найдено несколько карт, вот список:\n"
             for i in card[1]["data"]:
-                mes += f"{i}\n"
+                text += f"\n{i}"
             await update.message.reply_text(
-                mes)
+                text)
         else:
             await update.message.reply_text(
                 "Я не нашел никаких карт, попробуйте еще")
         return 2
     else:
+        text = f"""{card[1]["name"]} {card[1]["mana_cost"]}\n\n{card[1]["type_line"]}\n{card[1]["oracle_text"]}\n{card[1]["power"]}/{card[1]["toughness"]}"""
         await context.bot.send_photo(
             update.message.chat_id,
             card[1]["image_uris"]["normal"],
-            caption=card[1]["name"]
+            caption=text
+        )
+        return 1
+
+
+async def bot_get_rulings_1(update, context):
+    await update.message.reply_text(
+        "Введите название карты")
+    return 3
+
+
+async def bot_get_rulings_2(update, context):
+    card = await get_card(update.message.text)
+    if card[0] == "list":
+        if card[1]["data"]:
+            text = "Найдено несколько карт, вот список:\n"
+            for i in card[1]["data"]:
+                text += f"\n{i}"
+            await update.message.reply_text(
+                text)
+        else:
+            await update.message.reply_text(
+                "Я не нашел никаких карт, попробуйте еще")
+        return 2
+    else:
+        text = card[1]["name"] + "\n\n" + await get_rulings(card[1]["rulings_uri"])
+        await context.bot.send_photo(
+            update.message.chat_id,
+            card[1]["image_uris"]["normal"],
+            caption=text
         )
         return 1
 
@@ -56,7 +86,9 @@ async def bot_get_card_2(update, context):
 async def bot_help(update, context):
     await update.message.reply_text(
         "Вот список команд:\n"
-        "/help - вывести это сообщение\n")
+        "/help - вывести это сообщение\n"
+        "/card_info - по названию карты выводит ее оракл текст\n"
+        "/card_rule - по названию карты выводит рулинги этой карты")
 
 
 async def stop(update, context):
@@ -70,9 +102,12 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            1: [CommandHandler("help", bot_help), CommandHandler("card_info", bot_get_card_1)],
+            1: [CommandHandler("help", bot_help), CommandHandler("card_info", bot_get_card_1),
+                CommandHandler("card_rule", bot_get_rulings_1)],
             2: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               bot_get_card_2)]
+                               bot_get_card_2)],
+            3: [MessageHandler(filters.TEXT & ~filters.COMMAND,
+                               bot_get_rulings_2)]
         },
         fallbacks=[CommandHandler('stop', stop)]
     )
