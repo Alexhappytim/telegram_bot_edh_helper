@@ -1,9 +1,12 @@
 import logging
+import random
+
 from telegram.ext import Application, MessageHandler, filters, \
     ConversationHandler
 from config import BOT_TOKEN
 from telegram.ext import CommandHandler
 from scryfall_api import *
+from why_lost import *
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -83,12 +86,31 @@ async def bot_get_rulings_2(update, context):
         return 1
 
 
+async def bot_why_lost(update, context):
+    await update.message.reply_text(
+        random.choice(reason_why))
+    return 1
+
+
+async def bot_random_legend(update, context):
+    t = random.choice(legends)
+    card = await get_card(t)
+    await context.bot.send_photo(
+        update.message.chat_id,
+        card[1]["image_uris"]["normal"],
+        caption=f"Случайный командир для твоей колоды: {t}"
+    )
+    return 1
+
+
 async def bot_help(update, context):
     await update.message.reply_text(
         "Вот список команд:\n"
         "/help - вывести это сообщение\n"
         "/card_info - по названию карты выводит ее оракл текст\n"
-        "/card_rule - по названию карты выводит рулинги этой карты")
+        "/card_rule - по названию карты выводит рулинги этой карты\n"
+        "/new_commander - дает идеи для нового командира!\n"
+        "/triturahuesos - дает отмазку почему ты слил эту партию")
 
 
 async def stop(update, context):
@@ -102,8 +124,12 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            1: [CommandHandler("help", bot_help), CommandHandler("card_info", bot_get_card_1),
-                CommandHandler("card_rule", bot_get_rulings_1)],
+            1: [CommandHandler("help", bot_help),
+                CommandHandler("card_info", bot_get_card_1),
+                CommandHandler("card_rule", bot_get_rulings_1),
+                CommandHandler("new_commander", bot_random_legend),
+                CommandHandler("triturahuesos", bot_why_lost),
+                ],
             2: [MessageHandler(filters.TEXT & ~filters.COMMAND,
                                bot_get_card_2)],
             3: [MessageHandler(filters.TEXT & ~filters.COMMAND,
