@@ -4,6 +4,7 @@ import sqlite3
 
 from telegram.ext import Application, MessageHandler, filters, \
     ConversationHandler
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
 from config import BOT_TOKEN
 from telegram.ext import CommandHandler
 from scryfall_api import *
@@ -30,13 +31,16 @@ con.commit()
 async def start(update, context):
     id_user = update.effective_user.id
     result = cur.execute("""SELECT nickname_id FROM users""").fetchall()
-    if (id_user, ) not in result:
+    if (id_user,) not in result:
         cur.execute(f"""INSERT INTO users(nickname_id)
         VALUES({id_user})""")
         con.commit()
     await update.message.reply_text(
         "Привет, я бот который помогает Едехашникам!\n"
-        "Что бы узнать список команд напиши команду /help")
+        "Что бы узнать список команд напиши команду /help",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
     return 1
 
 
@@ -45,16 +49,20 @@ async def bot_get_card_1(update, context):
     result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
         WHERE nickname_id = {id_user}""").fetchall()
     was, was_str = [], '\nПрошлые запросы:\n'
-    print(was)
     for i in list(result[0]):
         if not (i is None) and i != 'None':
             was.append(i)
     if len(was) != 0:
         was_str += '\n'.join(i for i in was)
+        keyboard = ReplyKeyboardMarkup([was], one_time_keyboard=True, resize_keyboard=True)
+        await update.message.reply_text(
+            "Введите название карты" + was_str,
+            reply_markup=keyboard
+        )
+
     else:
-        was_str = ''
-    await update.message.reply_text(
-        "Введите название карты" + was_str)
+        await update.message.reply_text(
+            "Введите название карты")
     return 2
 
 
@@ -78,17 +86,19 @@ async def bot_get_card_2(update, context):
         await context.bot.send_photo(
             update.message.chat_id,
             card[1]["image_uris"]["normal"],
-            caption=text
+            caption=text,
+            reply_markup=ReplyKeyboardRemove()
         )
         id_user = update.effective_user.id
         result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
                 WHERE nickname_id = {id_user}""").fetchall()
         was = list(result[0])
-        new = [card[1]["name"], was[0], was[1], was[2], was[3]]
-        cur.execute(f"""UPDATE users
-        SET {','.join(f'card_{i} = "{new[i - 1]}"' for i in card_range)}
-        WHERE nickname_id = {id_user}""")
-        con.commit()
+        if card[1]["name"] not in was:
+            new = [card[1]["name"], was[0], was[1], was[2], was[3]]
+            cur.execute(f"""UPDATE users
+            SET {','.join(f'card_{i} = "{new[i - 1]}"' for i in card_range)}
+            WHERE nickname_id = {id_user}""")
+            con.commit()
 
         return 1
 
@@ -110,7 +120,8 @@ async def bot_get_rulings_2(update, context):
                 text)
         else:
             await update.message.reply_text(
-                "Я не нашел никаких карт, попробуйте еще")
+                "Я не нашел никаких карт, попробуйте еще"
+            )
         return 2
     else:
         text = card[1]["name"] + "\n\n" + await get_rulings(card[1]["rulings_uri"])
@@ -146,11 +157,12 @@ async def bot_help(update, context):
         "/card_info - по названию карты выводит ее оракл текст\n"
         "/card_rule - по названию карты выводит рулинги этой карты\n"
         "/new_commander - дает идеи для нового командира!\n"
-        "/triturahuesos - дает отмазку почему ты слил эту партию")
+        "/triturahuesos - дает отмазку почему ты слил эту партию"
+    )
 
 
 async def stop(update, context):
-    await update.message.reply_text("До следующего четверга!")
+    await update.message.reply_text("До следующего четверга!", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
