@@ -1,5 +1,6 @@
 import logging
 import random
+import sqlite3
 
 from telegram.ext import Application, MessageHandler, filters, \
     ConversationHandler
@@ -8,20 +9,31 @@ from telegram.ext import CommandHandler
 from scryfall_api import *
 from why_lost import *
 
+card_range = range(1, 6)
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.DEBUG
 )
 
 logger = logging.getLogger(__name__)
-
-
-async def echo(update, context):
-    await update.message.reply_text(
-        f"Я получил сообщение {update.message.text}")
+con = sqlite3.connect('data/statist.db')
+cur = con.cursor()
+cur.execute(f"""CREATE TABLE IF NOT EXISTS users(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   nickname_id INTEGER,
+   {','.join(f'card_{i} TEXT' for i in card_range)});
+   """)
+con.commit()
 
 
 async def start(update, context):
+    id_user = update.effective_user.id
+    result = cur.execute("""SELECT nickname_id FROM users""").fetchall()
+    if (id_user, ) not in result:
+        cur.execute(f"""INSERT INTO users(nickname_id)
+        VALUES({id_user})""")
+        con.commit()
     await update.message.reply_text(
         "Привет, я бот который помогает Едехашникам!\n"
         "Что бы узнать список команд напиши команду /help")
@@ -29,8 +41,20 @@ async def start(update, context):
 
 
 async def bot_get_card_1(update, context):
+    id_user = update.effective_user.id
+    result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
+        WHERE nickname_id = {id_user}""").fetchall()
+    was, was_str = [], '\nПрошлые запросы:\n'
+    print(was)
+    for i in list(result[0]):
+        if not (i is None) and i != 'None':
+            was.append(i)
+    if len(was) != 0:
+        was_str += '\n'.join(i for i in was)
+    else:
+        was_str = ''
     await update.message.reply_text(
-        "Введите название карты")
+        "Введите название карты" + was_str)
     return 2
 
 
@@ -48,12 +72,24 @@ async def bot_get_card_2(update, context):
                 "Я не нашел никаких карт, попробуйте еще")
         return 2
     else:
-        text = f"""{card[1]["name"]} {card[1]["mana_cost"]}\n\n{card[1]["type_line"]}\n{card[1]["oracle_text"]}\n{card[1]["power"]}/{card[1]["toughness"]}"""
+        text = f"""{card[1]["name"]} {card[1]["mana_cost"]}\n\n{card[1]["type_line"]}\n{card[1]["oracle_text"]}\n"""
+        if 'power' in card[1]:
+            text += f'{card[1]["power"]}/{card[1]["toughness"]}'
         await context.bot.send_photo(
             update.message.chat_id,
             card[1]["image_uris"]["normal"],
             caption=text
         )
+        id_user = update.effective_user.id
+        result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
+                WHERE nickname_id = {id_user}""").fetchall()
+        was = list(result[0])
+        new = [card[1]["name"], was[0], was[1], was[2], was[3]]
+        cur.execute(f"""UPDATE users
+        SET {','.join(f'card_{i} = "{new[i - 1]}"' for i in card_range)}
+        WHERE nickname_id = {id_user}""")
+        con.commit()
+
         return 1
 
 

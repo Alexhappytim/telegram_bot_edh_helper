@@ -1,5 +1,4 @@
 import aiohttp as aiohttp
-import requests
 
 
 async def get_response(url):
