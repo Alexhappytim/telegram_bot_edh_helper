@@ -1,4 +1,11 @@
 import aiohttp as aiohttp
+import requests
+import random
+
+
+card_list = requests.get(f"https://api.scryfall.com/catalog/card-names/").json()
+data_card_list = card_list["data"]
+count_card = len(data_card_list)
 
 
 async def get_response(url):
@@ -31,3 +38,6 @@ async def get_card(card):
         ret[1] = res
     return ret
 
+
+def random_card():
+    return data_card_list[random.randrange(count_card)]

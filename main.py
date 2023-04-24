@@ -44,6 +44,90 @@ async def start(update, context):
     return 1
 
 
+async def games_1(update, context):
+    await update.message.reply_text(
+        "Привет, правила игры такие:\n"
+        "Если угадываешь и силу и выносливость, то получаешь 2 балла,\n"
+        "Если угадываешь силу или выносливость, то получаешь 1 балл,\n"
+        "Если ничего, то 0. \n"
+        "Баллы, которые ты потерял, зарабатывает бот\n"
+        "Чтобы начать играть введите количество игр, иначи stop\n"
+        "PS: Ответы вводить в формате 'сила/выносливость"
+    )
+
+    return 4
+
+
+async def games_1_1(update, context):
+    number = update.message.text
+    print(number)
+    if (not number.isnumeric()) or int(float(number)) != float(number) or int(number) <= 0:
+        await update.message.reply_text(
+            "Введите натуральное число"
+        )
+        return 4
+    context.user_data['answer_right'] = 0
+    context.user_data['times'] = int(number)
+    context.user_data['times_was'] = 0
+    context.user_data['card_was'] = []
+    card = random_card()
+    card_test = await get_card(card)
+    while 'power' not in card_test[1]:
+        card = random_card()
+        card_test = await get_card(card)
+    context.user_data['card_was'].append(card)
+    await update.message.reply_text(
+        f"{card}"
+    )
+    return 5
+
+
+async def games_1_2(update, context):
+    nickname = update.effective_user.username
+    context.user_data['times_was'] += 1
+    params = update.message.text.split('/')
+    if len(params) != 2 or (not params[0].isnumeric()) or (not params[1].isnumeric()):
+        context.user_data['answer_right'] += 0
+    else:
+        card_test = await get_card(context.user_data['card_was'][-1])
+        strength, endurance = params
+        strength_r, endurance_r = card_test[1]['power'], card_test[1]['toughness']
+        if strength == strength_r and endurance == endurance_r:
+            context.user_data['answer_right'] += 1
+        elif strength == strength_r or endurance == endurance_r:
+            context.user_data['answer_right'] += 0.5
+        else:
+            context.user_data['answer_right'] += 0
+
+    if context.user_data['times'] == context.user_data['times_was']:
+        if context.user_data['answer_right'] > context.user_data['times'] * 0.5:
+            won = 'Вы'
+        elif context.user_data['answer_right'] < context.user_data['times'] * 0.5:
+            won = nickname
+        else:
+            won = 'никто'
+        await update.message.reply_text(
+            f"Счёт:\n"
+            f"Бот: {(context.user_data['times'] - context.user_data['answer_right']) * 2}\n"
+            f"{nickname}: {context.user_data['answer_right'] * 2}\n"
+            f"Победил: {won}"
+        )
+        return 1
+    else:
+        card = random_card()
+        card_test = await get_card(card)
+        while card in context.user_data['card_was'] or 'power' not in card_test[1]:
+            card = random_card()
+            card_test = await get_card(card)
+
+        await update.message.reply_text(
+            f"{card}"
+        )
+        context.user_data['card_was'].append(card)
+
+        return 5
+
+
 async def bot_get_card_1(update, context):
     id_user = update.effective_user.id
     result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
@@ -157,7 +241,8 @@ async def bot_help(update, context):
         "/card_info - по названию карты выводит ее оракл текст\n"
         "/card_rule - по названию карты выводит рулинги этой карты\n"
         "/new_commander - дает идеи для нового командира!\n"
-        "/triturahuesos - дает отмазку почему ты слил эту партию"
+        "/triturahuesos - дает отмазку почему ты слил эту партию\n"
+        "/skill - проверь свой уровень знания силы и выносливости существ"
     )
 
 
@@ -177,11 +262,16 @@ def main():
                 CommandHandler("card_rule", bot_get_rulings_1),
                 CommandHandler("new_commander", bot_random_legend),
                 CommandHandler("triturahuesos", bot_why_lost),
+                CommandHandler("skill", games_1),
                 ],
             2: [MessageHandler(filters.TEXT & ~filters.COMMAND,
                                bot_get_card_2)],
             3: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               bot_get_rulings_2)]
+                               bot_get_rulings_2)],
+            4: [MessageHandler(filters.TEXT & ~filters.COMMAND,
+                               games_1_1)],
+            5: [MessageHandler(filters.TEXT & ~filters.COMMAND,
+                               games_1_2)]
         },
         fallbacks=[CommandHandler('stop', stop)]
     )
