@@ -4,12 +4,14 @@ import sqlite3
 
 from telegram.ext import Application, MessageHandler, filters, \
     ConversationHandler
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InputMediaDocument, InputMediaPhoto
 from config import BOT_TOKEN
 from telegram.ext import CommandHandler
 from scryfall_api import *
 from why_lost import *
+from google_api_combos import get_combos
 
+combos = get_combos()
 card_range = range(1, 6)
 
 logging.basicConfig(
@@ -246,6 +248,25 @@ async def bot_random_legend(update, context):
     return 1
 
 
+async def bot_random_combo(update, context):
+    comb = random.choice(combos)
+    cards = []
+    for i in comb[1:11]:
+        if i:
+            t = await get_card(i)
+            cards.append(t[1]["image_uris"]["normal"])
+    await context.bot.send_media_group(
+        chat_id=update.message.chat_id,
+        media=[InputMediaPhoto(media=i) for i in cards],
+        caption=f"Итак, тебе попалась комба из таких вот карт.\n\n"
+                f"Для нее жолжно выполнятся условия: {comb[12]}\n\n"
+                f"Работает она вот так: {comb[13]}\n\n"
+                f"Как итог - {comb[14]}"
+    )
+    print(comb)
+    return 1
+
+
 async def bot_help(update, context):
     await update.message.reply_text(
         "Вот список команд:\n"
@@ -254,7 +275,8 @@ async def bot_help(update, context):
         "/card_rule - по названию карты выводит рулинги этой карты\n"
         "/new_commander - дает идеи для нового командира!\n"
         "/triturahuesos - дает отмазку почему ты слил эту партию\n"
-        "/skill - проверь свой уровень знания силы и выносливости существ"
+        "/skill - проверь свой уровень знания силы и выносливости существ\n"
+        "/random_combo - дает случайную комбо для твоей деки!"
     )
 
 
@@ -275,6 +297,7 @@ def main():
                 CommandHandler("new_commander", bot_random_legend),
                 CommandHandler("triturahuesos", bot_why_lost),
                 CommandHandler("skill", games_1),
+                CommandHandler("random_combo", bot_random_combo),
                 ],
             2: [MessageHandler(filters.TEXT & ~filters.COMMAND,
                                bot_get_card_2)],

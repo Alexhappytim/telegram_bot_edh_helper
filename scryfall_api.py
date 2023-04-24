@@ -28,7 +28,6 @@ async def get_card(card):
      если есть точное совпадение возвращает список формата ["card", d], где d - словарь с данными о карте.
      Иначе ["list", d], где d словарь, d["data"] - список подходящий карт"""
     res = await get_response(f"""https://api.scryfall.com/cards/named?fuzzy={card.replace(" ", "+")}""")
-    print(res)
     ret = [0, 0]
     if res["object"] == "error":
         ret[0] = "list"
