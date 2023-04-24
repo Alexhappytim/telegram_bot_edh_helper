@@ -77,7 +77,9 @@ async def games_1_1(update, context):
         card_test = await get_card(card)
     context.user_data['card_was'].append(card)
     await update.message.reply_text(
-        f"{card}"
+        f"{card}\n"
+        f'mana_cost: {card_test[1]["mana_cost"]}\n'
+        f'oracle_text: {card_test[1]["oracle_text"]}'
     )
     return 5
 
@@ -89,21 +91,27 @@ async def games_1_2(update, context):
     if len(params) != 2 or (not params[0].isnumeric()) or (not params[1].isnumeric()):
         context.user_data['answer_right'] += 0
     else:
+        answer = ''
         card_test = await get_card(context.user_data['card_was'][-1])
         strength, endurance = params
         strength_r, endurance_r = card_test[1]['power'], card_test[1]['toughness']
         if strength == strength_r and endurance == endurance_r:
             context.user_data['answer_right'] += 1
+            answer = "Абсолютно верно"
         elif strength == strength_r or endurance == endurance_r:
             context.user_data['answer_right'] += 0.5
+            answer = "Неплохо, наполовине от цели"
         else:
             context.user_data['answer_right'] += 0
-
+            answer = "Ай-ай-ай, какой из тебе игрок"
+        await update.message.reply_text(
+            answer
+        )
     if context.user_data['times'] == context.user_data['times_was']:
         if context.user_data['answer_right'] > context.user_data['times'] * 0.5:
-            won = 'Вы'
-        elif context.user_data['answer_right'] < context.user_data['times'] * 0.5:
             won = nickname
+        elif context.user_data['answer_right'] < context.user_data['times'] * 0.5:
+            won = "Бот"
         else:
             won = 'никто'
         await update.message.reply_text(
@@ -122,6 +130,8 @@ async def games_1_2(update, context):
 
         await update.message.reply_text(
             f"{card}"
+            f'mana_cost: {card_test[1]["mana_cost"]}\n'
+            f'oracle_text: {card_test[1]["oracle_text"]}'
         )
         context.user_data['card_was'].append(card)
 
