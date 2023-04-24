@@ -7,6 +7,8 @@ from telegram.ext import Application, MessageHandler, filters, \
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InputMediaDocument, InputMediaPhoto
 from config import BOT_TOKEN
 from telegram.ext import CommandHandler
+
+from proxy_generator import *
 from scryfall_api import *
 from why_lost import *
 from google_api_combos import get_combos
@@ -248,6 +250,25 @@ async def bot_random_legend(update, context):
     return 1
 
 
+async def bot_proxy_1(update, context):
+    await update.message.reply_text(
+        "Введите ссылку на деклист на Moxfield")
+    return 6
+
+
+async def bot_proxy_2(update, context):
+    await update.message.reply_text(
+        "Подождите немного, это может занять до минуты")
+    await decklist_to_pdf(await mox_decklist_parse(update.message.text))
+    await context.bot.send_document(
+        update.message.chat_id,
+        document=open("out.pdf", "rb"),
+        filename="out.pdf",
+        caption="your caption"
+    )
+    return 1
+
+
 async def bot_random_combo(update, context):
     comb = random.choice(combos)
     cards = []
@@ -298,6 +319,7 @@ def main():
                 CommandHandler("triturahuesos", bot_why_lost),
                 CommandHandler("skill", games_1),
                 CommandHandler("random_combo", bot_random_combo),
+                CommandHandler("proxy", bot_proxy_1),
                 ],
             2: [MessageHandler(filters.TEXT & ~filters.COMMAND,
                                bot_get_card_2)],
@@ -306,7 +328,9 @@ def main():
             4: [MessageHandler(filters.TEXT & ~filters.COMMAND,
                                games_1_1)],
             5: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               games_1_2)]
+                               games_1_2)],
+            6: [MessageHandler(filters.TEXT & ~filters.COMMAND,
+                               bot_proxy_2)]
         },
         fallbacks=[CommandHandler('stop', stop)]
     )
