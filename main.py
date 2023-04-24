@@ -86,12 +86,14 @@ async def games_1_1(update, context):
 
 async def games_1_2(update, context):
     nickname = update.effective_user.username
-    context.user_data['times_was'] += 1
     params = update.message.text.split('/')
     if len(params) != 2 or (not params[0].isnumeric()) or (not params[1].isnumeric()):
-        context.user_data['answer_right'] += 0
+        await update.message.reply_text(
+            "Неправильный формат ввода"
+        )
+        return 5
     else:
-        answer = ''
+        context.user_data['times_was'] += 1
         card_test = await get_card(context.user_data['card_was'][-1])
         strength, endurance = params
         strength_r, endurance_r = card_test[1]['power'], card_test[1]['toughness']
@@ -100,10 +102,10 @@ async def games_1_2(update, context):
             answer = "Абсолютно верно"
         elif strength == strength_r or endurance == endurance_r:
             context.user_data['answer_right'] += 0.5
-            answer = "Неплохо, наполовине от цели"
+            answer = f"Неплохо, наполовине от цели. Правильно: {strength_r}/{endurance_r}"
         else:
             context.user_data['answer_right'] += 0
-            answer = "Ай-ай-ай, какой из тебе игрок"
+            answer = f"Ай-ай-ай, какой из тебе игроки. Правильно: {strength_r}/{endurance_r}"
         await update.message.reply_text(
             answer
         )
