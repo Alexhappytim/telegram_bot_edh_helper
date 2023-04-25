@@ -50,13 +50,14 @@ async def start(update, context):
 
 async def games_1(update, context):
     await update.message.reply_text(
-        "Привет, правила игры такие:\n"
+        "Правида игры такие\n"
+        "Ты получишь имя, манакост и текст на карте, а нужно угадать ее характеристики \n"
         "Если угадываешь и силу и выносливость, то получаешь 2 балла,\n"
         "Если угадываешь силу или выносливость, то получаешь 1 балл,\n"
         "Если ничего, то 0. \n"
         "Баллы, которые ты потерял, зарабатывает бот\n"
-        "Чтобы начать играть введите количество игр, иначи stop\n"
-        "PS: Ответы вводить в формате 'сила/выносливость"
+        "Чтобы начать играть введите количество раундов, иначе cancel\n"
+        "PS: Ответы вводить в формате 'сила/выносливость'"
     )
 
     return 4
@@ -107,7 +108,7 @@ async def games_1_2(update, context):
             answer = "Абсолютно верно"
         elif strength == strength_r or endurance == endurance_r:
             context.user_data['answer_right'] += 0.5
-            answer = f"Неплохо, наполовине от цели. Правильно: {strength_r}/{endurance_r}"
+            answer = f"Неплохо, наполовину от цели. Правильно: {strength_r}/{endurance_r}"
         else:
             context.user_data['answer_right'] += 0
             answer = f"Ай-ай-ай, какой из тебя игрок. Правильно: {strength_r}/{endurance_r}"
@@ -161,7 +162,6 @@ async def bot_get_card_1(update, context):
             "Введите название карты" + was_str,
             reply_markup=keyboard
         )
-
     else:
         await update.message.reply_text(
             "Введите название карты")
@@ -169,19 +169,35 @@ async def bot_get_card_1(update, context):
 
 
 async def bot_get_card_2(update, context):
-    cards = await get_card(update.message.text)
+    cards = []
+    if update.message.text in list(map(str, list(range(1, 21)))) and "found_cards" in context.user_data:
+        cards = await get_card(context.user_data["found_cards"][int(update.message.text) - 1])
+    else:
+        cards = await get_card(update.message.text)
     if cards[0] == "list":
         if cards[1]["data"]:
-            text = "Найдено несколько карт, вот список:\n"
-            for i in cards[1]["data"]:
-                text += f"\n{i}"
+            text = "Найдено несколько карт, вот список:\n" \
+                   "Вы можете не вводить название, а указать номер из списка\n"
+            keyboard_a = [[]]
+            context.user_data["found_cards"] = cards[1]["data"]
+            for i in range(len(cards[1]["data"])):
+                text += f"\n{i + 1}) {cards[1]['data'][i]}"
+                if len(keyboard_a[0]) > 9:
+                    if len(keyboard_a) == 1:
+                        keyboard_a.append([])
+                    keyboard_a[1].append(str(i + 1))
+                else:
+                    keyboard_a[0].append(str(i + 1))
+            keyboard = ReplyKeyboardMarkup(keyboard_a, one_time_keyboard=True, resize_keyboard=True)
             await update.message.reply_text(
-                text)
+                text,
+                reply_markup=keyboard)
         else:
             await update.message.reply_text(
                 "Я не нашел никаких карт, попробуйте еще")
         return 2
     else:
+        flag = 1
         for card in cards[1]:
             text = f"""{card["name"]} {card["mana_cost"]}\n\n{card["type_line"]}\n{card["oracle_text"]}\n"""
             if 'power' in card:
@@ -196,12 +212,13 @@ async def bot_get_card_2(update, context):
             result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
                     WHERE nickname_id = {id_user}""").fetchall()
             was = list(result[0])
-            if card["name"] not in was:
+            if card["name"] not in was and flag:
                 new = [card["name"], was[0], was[1], was[2], was[3]]
                 cur.execute(f"""UPDATE users
                 SET {','.join(f'card_{i} = "{new[i - 1]}"' for i in card_range)}
                 WHERE nickname_id = {id_user}""")
                 con.commit()
+                flag = 0
 
         return 1
 
@@ -274,7 +291,7 @@ async def bot_proxy_2(update, context):
             update.message.chat_id,
             document=open("out.pdf", "rb"),
             filename="out.pdf",
-            caption="your caption"
+            caption="Обрати внимание на размер карт, при печати он может отличаться"
         )
         return 1
     except Exception as ex:
@@ -313,13 +330,18 @@ async def bot_help(update, context):
         "/triturahuesos - дает отмазку почему ты слил эту партию\n"
         "/skill - проверь свой уровень знания силы и выносливости существ\n"
         "/random_combo - дает случайную комбо для твоей деки!\n"
-        "/proxy - выдает картинку"
+        "/proxy - по ссылке на деклист на Moxfield.com возвращает пдфку с проксями\n"
+        "/cancel - для выхода из другой команды"
     )
 
 
 async def stop(update, context):
     await update.message.reply_text("До следующего четверга!", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
+
+
+async def cancel(update, context):
+    return 1
 
 
 def main():
@@ -336,17 +358,18 @@ def main():
                 CommandHandler("skill", games_1),
                 CommandHandler("random_combo", bot_random_combo),
                 CommandHandler("proxy", bot_proxy_1),
+                CommandHandler("cancel", cancel),
                 ],
-            2: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               bot_get_card_2)],
-            3: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               bot_get_rulings_2)],
-            4: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               games_1_1)],
-            5: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               games_1_2)],
-            6: [MessageHandler(filters.TEXT & ~filters.COMMAND,
-                               bot_proxy_2)]
+            2: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
+                                                                 bot_get_card_2)],
+            3: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
+                                                                 bot_get_rulings_2)],
+            4: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
+                                                                 games_1_1)],
+            5: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
+                                                                 games_1_2)],
+            6: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
+                                                                 bot_proxy_2)]
         },
         fallbacks=[CommandHandler('stop', stop)]
     )
