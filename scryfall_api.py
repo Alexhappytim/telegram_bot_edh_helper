@@ -40,3 +40,8 @@ async def get_card(card):
 
 def random_card():
     return data_card_list[random.randrange(count_card)]
+
+
+def one_ot_two(card):
+    if 'card_faces' in card[1]:
+        return

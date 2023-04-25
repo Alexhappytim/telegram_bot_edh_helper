@@ -109,7 +109,7 @@ async def games_1_2(update, context):
             answer = f"Неплохо, наполовине от цели. Правильно: {strength_r}/{endurance_r}"
         else:
             context.user_data['answer_right'] += 0
-            answer = f"Ай-ай-ай, какой из тебе игроки. Правильно: {strength_r}/{endurance_r}"
+            answer = f"Ай-ай-ай, какой из тебя игрок. Правильно: {strength_r}/{endurance_r}"
         await update.message.reply_text(
             answer
         )
@@ -259,14 +259,19 @@ async def bot_proxy_1(update, context):
 async def bot_proxy_2(update, context):
     await update.message.reply_text(
         "Подождите немного, это может занять до минуты")
-    await decklist_to_pdf(await mox_decklist_parse(update.message.text))
-    await context.bot.send_document(
-        update.message.chat_id,
-        document=open("out.pdf", "rb"),
-        filename="out.pdf",
-        caption="your caption"
-    )
-    return 1
+    try:
+        await decklist_to_pdf(await mox_decklist_parse(update.message.text))
+        await context.bot.send_document(
+            update.message.chat_id,
+            document=open("out.pdf", "rb"),
+            filename="out.pdf",
+            caption="your caption"
+        )
+        return 1
+    except Exception as ex:
+        await update.message.reply_text(
+            "Не является действительнной ссылкой")
+        return 6
 
 
 async def bot_random_combo(update, context):
@@ -297,7 +302,8 @@ async def bot_help(update, context):
         "/new_commander - дает идеи для нового командира!\n"
         "/triturahuesos - дает отмазку почему ты слил эту партию\n"
         "/skill - проверь свой уровень знания силы и выносливости существ\n"
-        "/random_combo - дает случайную комбо для твоей деки!"
+        "/random_combo - дает случайную комбо для твоей деки!\n"
+        "/proxy - выдает картинку"
     )
 
 
