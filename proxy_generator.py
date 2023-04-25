@@ -11,15 +11,11 @@ async def mox_decklist_parse(url):
 
 
 async def card_to_image(name):
-    card = await get_card(name)
-    print(card[1])
-    if 'card_faces' in card[1]:
-        cards = card[1]['card_faces']
-    else:
-        cards = [card[1]]
+    cards = await get_card(name)
+    print(cards[1])
     img = []
-    for card_img in cards:
-        url = card_img["image_uris"]["normal"]
+    for card in cards:
+        url = card["image_uris"]["normal"]
         response = requests.get(url)
         image = Image.open(BytesIO(response.content))
         width = 760

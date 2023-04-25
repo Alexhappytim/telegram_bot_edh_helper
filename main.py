@@ -76,14 +76,15 @@ async def games_1_1(update, context):
     context.user_data['card_was'] = []
     card = random_card()
     card_test = await get_card(card)
-    while 'power' not in card_test[1]:
+    print(card_test)
+    while 'power' not in card_test[1][0]:
         card = random_card()
         card_test = await get_card(card)
     context.user_data['card_was'].append(card)
     await update.message.reply_text(
         f"{card}\n"
-        f'mana_cost: {card_test[1]["mana_cost"]}\n'
-        f'oracle_text: {card_test[1]["oracle_text"]}'
+        f'mana_cost: {card_test[1][0]["mana_cost"]}\n'
+        f'oracle_text: {card_test[1][0]["oracle_text"]}'
     )
     return 5
 
@@ -100,7 +101,7 @@ async def games_1_2(update, context):
         context.user_data['times_was'] += 1
         card_test = await get_card(context.user_data['card_was'][-1])
         strength, endurance = params
-        strength_r, endurance_r = card_test[1]['power'], card_test[1]['toughness']
+        strength_r, endurance_r = card_test[1][0]['power'], card_test[1][0]['toughness']
         if strength == strength_r and endurance == endurance_r:
             context.user_data['answer_right'] += 1
             answer = "Абсолютно верно"
@@ -130,14 +131,15 @@ async def games_1_2(update, context):
     else:
         card = random_card()
         card_test = await get_card(card)
-        while card in context.user_data['card_was'] or 'power' not in card_test[1]:
+        print(card_test)
+        while card in context.user_data['card_was'] or 'power' not in card_test[1][0]:
             card = random_card()
             card_test = await get_card(card)
 
         await update.message.reply_text(
             f"{card}"
-            f'mana_cost: {card_test[1]["mana_cost"]}\n'
-            f'oracle_text: {card_test[1]["oracle_text"]}'
+            f'mana_cost: {card_test[1][0]["mana_cost"]}\n'
+            f'oracle_text: {card_test[1][0]["oracle_text"]}'
         )
         context.user_data['card_was'].append(card)
 
@@ -167,11 +169,11 @@ async def bot_get_card_1(update, context):
 
 
 async def bot_get_card_2(update, context):
-    card = await get_card(update.message.text)
-    if card[0] == "list":
-        if card[1]["data"]:
+    cards = await get_card(update.message.text)
+    if cards[0] == "list":
+        if cards[1]["data"]:
             text = "Найдено несколько карт, вот список:\n"
-            for i in card[1]["data"]:
+            for i in cards[1]["data"]:
                 text += f"\n{i}"
             await update.message.reply_text(
                 text)
@@ -180,25 +182,26 @@ async def bot_get_card_2(update, context):
                 "Я не нашел никаких карт, попробуйте еще")
         return 2
     else:
-        text = f"""{card[1]["name"]} {card[1]["mana_cost"]}\n\n{card[1]["type_line"]}\n{card[1]["oracle_text"]}\n"""
-        if 'power' in card[1]:
-            text += f'{card[1]["power"]}/{card[1]["toughness"]}'
-        await context.bot.send_photo(
-            update.message.chat_id,
-            card[1]["image_uris"]["normal"],
-            caption=text,
-            reply_markup=ReplyKeyboardRemove()
-        )
-        id_user = update.effective_user.id
-        result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
-                WHERE nickname_id = {id_user}""").fetchall()
-        was = list(result[0])
-        if card[1]["name"] not in was:
-            new = [card[1]["name"], was[0], was[1], was[2], was[3]]
-            cur.execute(f"""UPDATE users
-            SET {','.join(f'card_{i} = "{new[i - 1]}"' for i in card_range)}
-            WHERE nickname_id = {id_user}""")
-            con.commit()
+        for card in cards[1]:
+            text = f"""{card["name"]} {card["mana_cost"]}\n\n{card["type_line"]}\n{card["oracle_text"]}\n"""
+            if 'power' in card:
+                text += f'{card["power"]}/{card["toughness"]}'
+            await context.bot.send_photo(
+                update.message.chat_id,
+                card["image_uris"]["normal"],
+                caption=text,
+                reply_markup=ReplyKeyboardRemove()
+            )
+            id_user = update.effective_user.id
+            result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
+                    WHERE nickname_id = {id_user}""").fetchall()
+            was = list(result[0])
+            if card["name"] not in was:
+                new = [card["name"], was[0], was[1], was[2], was[3]]
+                cur.execute(f"""UPDATE users
+                SET {','.join(f'card_{i} = "{new[i - 1]}"' for i in card_range)}
+                WHERE nickname_id = {id_user}""")
+                con.commit()
 
         return 1
 
@@ -210,11 +213,11 @@ async def bot_get_rulings_1(update, context):
 
 
 async def bot_get_rulings_2(update, context):
-    card = await get_card(update.message.text)
-    if card[0] == "list":
-        if card[1]["data"]:
+    cards = await get_card(update.message.text)
+    if cards[0] == "list":
+        if cards[1]["data"]:
             text = "Найдено несколько карт, вот список:\n"
-            for i in card[1]["data"]:
+            for i in cards[1]["data"]:
                 text += f"\n{i}"
             await update.message.reply_text(
                 text)
@@ -224,12 +227,17 @@ async def bot_get_rulings_2(update, context):
             )
         return 2
     else:
-        text = card[1]["name"] + "\n\n" + await get_rulings(card[1]["rulings_uri"])
-        await context.bot.send_photo(
-            update.message.chat_id,
-            card[1]["image_uris"]["normal"],
-            caption=text
-        )
+        print(cards)
+        for card in cards[1]:
+            text = card["name"] + "\n\n" + await get_rulings(card["rulings_uri"])
+            print(text)
+            await context.bot.send_photo(
+                update.message.chat_id,
+                card["image_uris"]["normal"],
+                # caption=text
+            )
+            await update.message.reply_text(
+                text)
         return 1
 
 
@@ -241,12 +249,13 @@ async def bot_why_lost(update, context):
 
 async def bot_random_legend(update, context):
     t = random.choice(legends)
-    card = await get_card(t)
-    await context.bot.send_photo(
-        update.message.chat_id,
-        card[1]["image_uris"]["normal"],
-        caption=f"Случайный командир для твоей колоды: {t}"
-    )
+    cards = await get_card(t)
+    for card in cards[1]:
+        await context.bot.send_photo(
+            update.message.chat_id,
+            card["image_uris"]["normal"],
+            caption=f"Случайный командир для твоей колоды: {t}"
+        )
     return 1
 
 
@@ -280,7 +289,8 @@ async def bot_random_combo(update, context):
     for i in comb[1:11]:
         if i:
             t = await get_card(i)
-            cards.append(t[1]["image_uris"]["normal"])
+            for card in t[1]:
+                cards.append(card["image_uris"]["normal"])
     await context.bot.send_media_group(
         chat_id=update.message.chat_id,
         media=[InputMediaPhoto(media=i) for i in cards],

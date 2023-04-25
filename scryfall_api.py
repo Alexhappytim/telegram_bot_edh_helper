@@ -34,7 +34,20 @@ async def get_card(card):
         ret[1] = await get_response(f"""https://api.scryfall.com/cards/autocomplete?q={card.replace(" ", "+")}""")
     else:
         ret[0] = "card"
-        ret[1] = res
+        if 'card_faces' in res:
+            spis_json = []
+            new_json = {}
+            for i in res:
+                if i != 'card_faces':
+                    new_json[i] = res[i]
+            for i in res['card_faces']:
+                card = new_json.copy()
+                for j in i:
+                    card[j] = i[j]
+                spis_json.append(card)
+            ret[1] = spis_json
+        else:
+            ret[1] = [res]
     return ret
 
 
