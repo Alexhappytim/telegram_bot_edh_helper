@@ -31,6 +31,12 @@ cur.execute(f"""CREATE TABLE IF NOT EXISTS users(
    """)
 con.commit()
 
+reply_keyboard = ReplyKeyboardMarkup(
+    [["/help", "/card_info", "/card_rule"],
+     ["/new_commander", "/triturahuesos", "/skill"],
+     ["/random_combo", "/proxy","/ru_proxy"]],
+    one_time_keyboard=False)
+
 
 async def start(update, context):
     id_user = update.effective_user.id
@@ -42,7 +48,7 @@ async def start(update, context):
     await update.message.reply_text(
         "Привет, я бот который помогает Едехашникам!\n"
         "Что бы узнать список команд напиши команду /help",
-        reply_markup=ReplyKeyboardRemove()
+        reply_markup=reply_keyboard
     )
 
     return 1
@@ -126,7 +132,8 @@ async def games_1_2(update, context):
             f"Счёт:\n"
             f"Бот: {(context.user_data['times'] - context.user_data['answer_right']) * 2}\n"
             f"{nickname}: {context.user_data['answer_right'] * 2}\n"
-            f"Победил: {won}"
+            f"Победил: {won}",
+            reply_markup=reply_keyboard
         )
         return 1
     else:
@@ -206,7 +213,7 @@ async def bot_get_card_2(update, context):
                 update.message.chat_id,
                 card["image_uris"]["normal"],
                 caption=text,
-                reply_markup=ReplyKeyboardRemove()
+                reply_markup=reply_keyboard
             )
             id_user = update.effective_user.id
             result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
@@ -224,43 +231,82 @@ async def bot_get_card_2(update, context):
 
 
 async def bot_get_rulings_1(update, context):
-    await update.message.reply_text(
-        "Введите название карты")
+    id_user = update.effective_user.id
+    result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
+            WHERE nickname_id = {id_user}""").fetchall()
+    was, was_str = [], '\nПрошлые запросы:\n'
+    for i in list(result[0]):
+        if not (i is None) and i != 'None':
+            was.append(i)
+    if len(was) != 0:
+        was_str += '\n'.join(i for i in was)
+        keyboard = ReplyKeyboardMarkup([was], one_time_keyboard=True, resize_keyboard=True)
+        await update.message.reply_text(
+            "Введите название карты" + was_str,
+            reply_markup=keyboard
+        )
+    else:
+        await update.message.reply_text(
+            "Введите название карты")
     return 3
 
 
 async def bot_get_rulings_2(update, context):
-    cards = await get_card(update.message.text)
+    if update.message.text in list(map(str, list(range(1, 21)))) and "found_cards" in context.user_data:
+        cards = await get_card(context.user_data["found_cards"][int(update.message.text) - 1])
+    else:
+        cards = await get_card(update.message.text)
     if cards[0] == "list":
         if cards[1]["data"]:
-            text = "Найдено несколько карт, вот список:\n"
-            for i in cards[1]["data"]:
-                text += f"\n{i}"
+            text = "Найдено несколько карт, вот список:\n" \
+                   "Вы можете не вводить название, а указать номер из списка\n"
+            keyboard_a = [[]]
+            context.user_data["found_cards"] = cards[1]["data"]
+            for i in range(len(cards[1]["data"])):
+                text += f"\n{i + 1}) {cards[1]['data'][i]}"
+                if len(keyboard_a[0]) > 9:
+                    if len(keyboard_a) == 1:
+                        keyboard_a.append([])
+                    keyboard_a[1].append(str(i + 1))
+                else:
+                    keyboard_a[0].append(str(i + 1))
+            keyboard = ReplyKeyboardMarkup(keyboard_a, one_time_keyboard=True, resize_keyboard=True)
             await update.message.reply_text(
-                text)
+                text,
+                reply_markup=keyboard)
         else:
             await update.message.reply_text(
-                "Я не нашел никаких карт, попробуйте еще"
-            )
-        return 2
+                "Я не нашел никаких карт, попробуйте еще")
+        return 3
     else:
-        print(cards)
+        flag = 1
         for card in cards[1]:
             text = card["name"] + "\n\n" + await get_rulings(card["rulings_uri"])
-            print(text)
             await context.bot.send_photo(
                 update.message.chat_id,
                 card["image_uris"]["normal"],
-                # caption=text
+                caption=text,
+                reply_markup=reply_keyboard
             )
-            await update.message.reply_text(
-                text)
+            id_user = update.effective_user.id
+            result = cur.execute(f"""SELECT {','.join(f'card_{i} TEXT' for i in card_range)} FROM users
+                       WHERE nickname_id = {id_user}""").fetchall()
+            was = list(result[0])
+            if card["name"] not in was and flag:
+                new = [card["name"], was[0], was[1], was[2], was[3]]
+                cur.execute(f"""UPDATE users
+                   SET {','.join(f'card_{i} = "{new[i - 1]}"' for i in card_range)}
+                   WHERE nickname_id = {id_user}""")
+                con.commit()
+                flag = 0
+
         return 1
 
 
 async def bot_why_lost(update, context):
     await update.message.reply_text(
-        random.choice(reason_why))
+        random.choice(reason_why),
+        reply_markup=reply_keyboard)
     return 1
 
 
@@ -271,7 +317,8 @@ async def bot_random_legend(update, context):
         await context.bot.send_photo(
             update.message.chat_id,
             card["image_uris"]["normal"],
-            caption=f"Случайный командир для твоей колоды: {t}"
+            caption=f"Случайный командир для твоей колоды: {t}",
+            reply_markup=reply_keyboard
         )
     return 1
 
@@ -286,7 +333,7 @@ async def bot_proxy_2(update, context):
     await update.message.reply_text(
         "Подождите немного, это может занять до минуты")
     try:
-        await decklist_to_pdf(await mox_decklist_parse(update.message.text))
+        await decklist_to_pdf(await mox_decklist_parse(update.message.text), "en")
         await context.bot.send_document(
             update.message.chat_id,
             document=open("out.pdf", "rb"),
@@ -298,6 +345,31 @@ async def bot_proxy_2(update, context):
         await update.message.reply_text(
             "Не является действительнной ссылкой")
         return 6
+
+
+async def bot_proxy_ru_1(update, context):
+    await update.message.reply_text(
+        "Введите ссылку на деклист на Moxfield")
+    return 7
+
+
+async def bot_proxy_ru_2(update, context):
+    await update.message.reply_text(
+        "Подождите немного, это может занять до минуты")
+    try:
+        await decklist_to_pdf(await mox_decklist_parse(update.message.text), "ru")
+        await context.bot.send_document(
+            update.message.chat_id,
+            document=open("out.pdf", "rb"),
+            filename="out.pdf",
+            caption="Обрати внимание на размер карт, при печати он может отличаться"
+        )
+        return 1
+    except Exception as ex:
+        await update.message.reply_text(
+            "Не является действительнной ссылкой")
+
+        return 7
 
 
 async def bot_random_combo(update, context):
@@ -331,7 +403,9 @@ async def bot_help(update, context):
         "/skill - проверь свой уровень знания силы и выносливости существ\n"
         "/random_combo - дает случайную комбо для твоей деки!\n"
         "/proxy - по ссылке на деклист на Moxfield.com возвращает пдфку с проксями\n"
-        "/cancel - для выхода из другой команды"
+        "/ru_proxy - если есть русский принт у карты, то будет он, а не английский\n"
+        "/cancel - для выхода из другой команды",
+        reply_markup=reply_keyboard
     )
 
 
@@ -341,6 +415,7 @@ async def stop(update, context):
 
 
 async def cancel(update, context):
+    await update.message.reply_text("Возвращаюсь в главное меню", reply_markup=reply_keyboard)
     return 1
 
 
@@ -358,6 +433,7 @@ def main():
                 CommandHandler("skill", games_1),
                 CommandHandler("random_combo", bot_random_combo),
                 CommandHandler("proxy", bot_proxy_1),
+                CommandHandler("ru_proxy", bot_proxy_ru_1),
                 CommandHandler("cancel", cancel),
                 ],
             2: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
@@ -369,7 +445,9 @@ def main():
             5: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
                                                                  games_1_2)],
             6: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
-                                                                 bot_proxy_2)]
+                                                                 bot_proxy_2)],
+            7: [CommandHandler("cancel", cancel), MessageHandler(filters.TEXT & ~filters.COMMAND,
+                                                                 bot_proxy_ru_2)],
         },
         fallbacks=[CommandHandler('stop', stop)]
     )
